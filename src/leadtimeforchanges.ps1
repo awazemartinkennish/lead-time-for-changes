@@ -9,7 +9,8 @@ Param(
     [string] $actionsToken = "",
     [string] $appId = "",
     [string] $appInstallationId = "",
-    [string] $appPrivateKey = ""
+    [string] $appPrivateKey = "",
+    [string] $skipLabels = ""
 )
 
 #The main function
@@ -22,7 +23,8 @@ function Main ([string] $ownerRepo,
     [string] $actionsToken = "",
     [string] $appId = "",
     [string] $appInstallationId = "",
-    [string] $appPrivateKey = "")
+    [string] $appPrivateKey = "",
+    [string] $skipLabels)
 {
 
     #==========================================
@@ -32,6 +34,7 @@ function Main ([string] $ownerRepo,
     $repo = $ownerRepoArray[1]
     $workflowsArray = $workflows -split ','
     $numberOfDays = $numberOfDays        
+    $skipLabelsArray = $skipLabels -split ','
     if ($commitCountingMethod -eq "")
     {
         $commitCountingMethod = "last"
@@ -64,9 +67,23 @@ function Main ([string] $ownerRepo,
         break
     }  
 
+
     $prCounter = 0
     $totalPRHours = 0
+    $prSkipCounter = 0
     Foreach ($pr in $prsResponse){
+
+        $skipLabelPresentOnPr = false
+        Foreach($label in $pr.labels) {
+            if ($skipLabelsArray.Contains($label.name)) {
+                $skipLabelPresentOnPr = true
+            }
+        }
+
+        if ($skipLabelPresentOnPr) {
+            $prSkipCounter++
+            break
+        }
 
         $mergedAt = $pr.merged_at
         if ($mergedAt -ne $null -and $pr.merged_at -gt (Get-Date).AddDays(-$numberOfDays))
@@ -205,6 +222,7 @@ function Main ([string] $ownerRepo,
     Write-Host "Workflow average time duration $($totalAverageworkflowHours)"
     $leadTimeForChangesInHours = ($totalPRHours / $prCounter) + ($totalAverageworkflowHours)
     Write-Host "Lead time for changes in hours: $leadTimeForChangesInHours"
+    Write-Host "PRs skipped due to labels: $prSkipCounter"
 
     #==========================================
     #Show current rate limit
@@ -410,4 +428,4 @@ function GetFormattedMarkdownForNoResult([string] $workflows, [string] $numberOf
     return $markdown
 }
 
-main -ownerRepo $ownerRepo -workflows $workflows -branch $branch -numberOfDays $numberOfDays -commitCountingMethod $commitCountingMethod  -patToken $patToken -actionsToken $actionsToken -appId $appId -appInstallationId $appInstallationId -appPrivateKey $appPrivateKey
+main -ownerRepo $ownerRepo -workflows $workflows -branch $branch -numberOfDays $numberOfDays -commitCountingMethod $commitCountingMethod  -patToken $patToken -actionsToken $actionsToken -appId $appId -appInstallationId $appInstallationId -appPrivateKey $appPrivateKey -skipLabels $skipLabels
